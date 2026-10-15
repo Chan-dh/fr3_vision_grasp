@@ -1,0 +1,54 @@
+# RL 抓取训练配置（规格：docs/rl_grasp_plan.md 4.3/4.4 节）
+# 数值来源见方案文档；M1-5 感知误差实测后替换 noise 基准值。
+
+# 课程阶段（4.4④）。xy 为目标方块采样范围；noise_scale 乘在 noise 基准上；
+# others: far = 移出工作区固定放 (0.90, ±0.20)，near = 工作区内随机邻近放置。
+# C 阶段 yaw 渐进（±15°→±30°→±45°）和 D 阶段 min_dist 渐进（0.10→0.06）
+# 由训练脚本通过 set_stage / 属性覆盖实现，此处给最终值。
+stages:
+  # A0 = E1 探索兜底（rl_reward_fix_plan.md §5）：交接高度 12→6 cm，缩短随机
+  # 探索到首次成功的距离；其余参数同 A。未写 approach_height 的档位默认 0.12。
+  A0: { xy: [[0.40, 0.55], [-0.12, 0.12]], yaw_deg: 0, noise_scale: 0.5, domain_rand: false, others: far, approach_height: 0.06 }
+  A: { xy: [[0.40, 0.55], [-0.12, 0.12]], yaw_deg: 0, noise_scale: 0.5, domain_rand: false, others: far }
+  B: { xy: [[0.30, 0.67], [-0.23, 0.23]], yaw_deg: 0, noise_scale: 1.0, domain_rand: true, others: far }
+  C: { xy: [[0.30, 0.67], [-0.23, 0.23]], yaw_deg: 45, noise_scale: 1.5, domain_rand: true, others: far }
+  D: { xy: [[0.30, 0.67], [-0.23, 0.23]], yaw_deg: 45, noise_scale: 1.5, domain_rand: true, others: near, min_dist: 0.06 }
+
+# 感知噪声（4.4⑤，M1-5 实测校准 2026-10-06）。实测：静止场景误差为确定性
+# 偏置而非随机噪声——red (-0.02, +0.00)mm、green (+0.68, +1.99)mm、
+# blue (-1.57, -0.18)mm，z 全部 0.00mm；三色（三个位置）合并散布
+# σ≈0.9–1.0mm，最大偏置 ~2mm。训练用高斯建模逐回合偏置散布：
+# σ_xy=1.5mm 覆盖实测最大偏置，σ_z=0.5mm 留深度离散余量。高斯截断。
+noise:
+  sigma_xy: 0.0015     # m
+  clip_xy: 0.004
+  sigma_z: 0.0005
+  clip_z: 0.002
+  sigma_yaw: 0.035     # rad ≈ 2°（perception 尚未输出 yaw，M3 实测后替换）
+  clip_yaw: 0.087      # rad ≈ 5°
+
+# 物理随机化（4.4③，阶段 B 起启用；标称值来自 MJCF）
+domain_rand:
+  mass: [0.018, 0.035]       # kg，标称 0.025
+  cube_friction: [0.9, 1.4]  # 标称 1.2
+  pad_friction: [0.8, 1.2]   # 指尖 pad，标称 1.0
+
+# 奖励（方案 A：PBRS 势函数塑形 + 稀疏结局项，docs/rl_reward_fix_plan.md A3）。
+# 稠密引导只有 Φ 差分 r = γ·Φ(s') − Φ(s)；结局只由稀疏项决定。
+# Φ = w_reach·reach + w_yaw·yaw + w_close·close + w_grasp·grasp + w_lift·lift，
+# 各分量 ∈ [0,1]，Φ_max = Σw = 4.4。
+reward:
+  gamma: 0.99          # 必须等于 PPO gamma（train_ppo 启动时校验；PBRS 要求两者一致）
+  grasp_gap: 0.002     # 抓取点在方块中心上方 2 mm（原 0.015 与脚本基线不一致；z_min=0.063 可达）
+  reach_scale: 0.10    # 粗引导 tanh 尺度
+  near_scale: 0.02     # 细门控 tanh 尺度
+  w_reach: 1.0
+  w_yaw: 0.1
+  w_close: 0.3
+  w_grasp: 1.0
+  w_lift: 2.0          # Φ_max = 4.4
+  success: 20.0
+  fail_penalty: 5.0    # out_of_bounds / table_contact
+  drop_penalty: 3.0    # 另外还会失去 grasp + lift 的势（最多 3.0）
+  push_penalty: 0.1    # 每步；从 0.3 降低，避免"推了方块就想结束回合"
+  action_change: 0.01

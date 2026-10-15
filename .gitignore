@@ -1,0 +1,24 @@
+# 项目私有文档（内部设计过程记录，不公开）
+docs/
+
+# 编辑器配置
+.vscode/
+
+# Python 虚拟环境
+.venv-fr3/
+
+# pytest 缓存
+.pytest_cache/
+
+# Python 运行时缓存
+__pycache__/
+*.py[cod]
+
+# colcon 构建产物
+franka_ros2_ws/build_vision/
+franka_ros2_ws/install_vision/
+franka_ros2_ws/log_vision/
+
+# 训练产物（checkpoint / TensorBoard 日志）
+rl/runs/
+
