@@ -178,6 +178,38 @@ python rl/eval_policy.py              # 评估与导出
 
 多核机器训练前 `export OMP_NUM_THREADS=8`。详细流程见 [RL 训练指南](docs/rl_training_guide.md)，设计决策见 [rl_grasp_plan.md](docs/rl_grasp_plan.md) 与 [rl_reward_fix_plan.md](docs/rl_reward_fix_plan.md)，接口与验证细节见 [使用指南](docs/usage.md)。
 
+### 可视化运行
+
+**RL 策略回放（纯 MuJoCo，无 ROS）**——`rl/play_policy.py` 加载训练 checkpoint 在场景中演示训练成果：
+
+```bash
+source scripts/env.sh
+# 交互式 viewer：GUI / 桌面环境，可鼠标拖动视角，实时速率演示
+python rl/play_policy.py --model rl/runs/e2_bc_v4/checkpoints/ppo_final.zip \
+    --stage D --episodes 5 --viewer
+# 视频输出：headless 容器（无显示环境），EGL 离屏渲染 mp4
+MUJOCO_GL=egl python rl/play_policy.py --model rl/runs/e2_bc_v4/checkpoints/ppo_final.zip \
+    --stage D --episodes 3 --video rl/runs/e2_bc_v4/play_final.mp4
+```
+
+`--stage D` 为最难课程档（±45° yaw + 域随机化 + 干扰方块 6 cm 间距）；默认与评估同口径（关闭感知噪声与随机化），加 `--noisy` 开启扰动；换 `--stage A` 可对比简单档。
+
+**全流程可视化（视觉感知 + 运动规划 + 抓取放置）**——一条命令启动 MuJoCo 场景、RViz、相机画面、感知与 pick 节点（等价于上文的 `run_demo.sh`）：
+
+```bash
+source scripts/env.sh
+ros2 launch fr3_vision_grasp fr3_sim.launch.py color:=red
+```
+
+待 MoveIt 就绪后，另一终端触发抓取，随后在 pick 节点日志中观看状态机流转 `DETECTING → OPENING → … → SUCCEEDED`：
+
+```bash
+source scripts/env.sh
+ros2 service call /pick/start std_srvs/srv/Trigger '{}'
+```
+
+调用 `/pick/reset` 后可再次开始（换色改 launch 参数 `color:=green/blue`）。注意：此链路的抓取段当前为脚本轨迹；RL 策略已导出至 `rl/runs/e2_bc_v4/policy.npz`（D 档 100 回合 100% 成功，numpy 前向与训练一致性 max|Δ| < 1e-6），接入 pick.py 部署为下一步工作。
+
 ## 目录结构
 
 ```
