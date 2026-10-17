@@ -9,8 +9,7 @@
 
 **技术栈**：Python / C++、ROS 2 Humble、MoveIt 2、MuJoCo 3.x、OpenCV、TF2、Gymnasium、Stable-Baselines3（PPO）、PyTorch、pytest、TensorBoard
 
-
-<video src="./docs/play_final.mp4" controls width="600"></video>
+![](./docs/demo_rl.gif)
 
 ## 系统架构
 
